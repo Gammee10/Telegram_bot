@@ -1,0 +1,120 @@
+import logging
+import re
+
+from telegram import Update
+from telegram.constants import ChatType
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    ContextTypes,
+    MessageHandler,
+    filters,
+)
+
+from bot.gemini import GeminiClient, GeminiError
+from bot.memory import ConversationMemory
+from bot.telegram_utils import remove_bot_mention, send_markdown_chunks, with_typing
+
+
+logger = logging.getLogger(__name__)
+
+
+START_TEXT = (
+    "Hi! I am your Gemini-powered AI assistant.\n\n"
+    "Message me directly, or add me to a group and mention me when you want help."
+)
+
+HELP_TEXT = (
+    "*How to use me*\n\n"
+    "- Private chat: send any message.\n"
+    "- Group chat: mention me, like `@BotName explain OOP`.\n"
+    "- Group chat: reply to one of my messages to continue the thread.\n"
+    "- `/reset` clears this chat's conversation memory."
+)
+
+
+def register_handlers(application: Application) -> None:
+    application.add_handler(CommandHandler("start", start_command))
+    application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CommandHandler("reset", reset_command))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    application.add_error_handler(error_handler)
+
+
+async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.effective_message:
+        await update.effective_message.reply_text(START_TEXT)
+
+
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.effective_message:
+        await update.effective_message.reply_text(HELP_TEXT, parse_mode="Markdown")
+
+
+async def reset_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not update.effective_chat or not update.effective_message:
+        return
+
+    memory: ConversationMemory = context.application.bot_data["memory"]
+    memory.reset(update.effective_chat.id)
+    await update.effective_message.reply_text("Conversation memory cleared for this chat.")
+
+
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    message = update.effective_message
+    chat = update.effective_chat
+    user = update.effective_user
+    if not message or not chat or not user:
+        return
+
+    original_text = (message.text or "").strip()
+    if not original_text:
+        return
+
+    bot_user = await context.bot.get_me()
+    should_answer = chat.type == ChatType.PRIVATE
+    prompt = original_text
+
+    if chat.type in {ChatType.GROUP, ChatType.SUPERGROUP}:
+        mention_pattern = rf"@{re.escape(bot_user.username or '')}\b"
+        mentioned = bool(bot_user.username and re.search(mention_pattern, original_text, re.IGNORECASE))
+        replied_to_bot = bool(
+            message.reply_to_message
+            and message.reply_to_message.from_user
+            and message.reply_to_message.from_user.id == bot_user.id
+        )
+        should_answer = mentioned or replied_to_bot
+
+        if mentioned and bot_user.username:
+            prompt = remove_bot_mention(original_text, bot_user.username)
+
+    if not should_answer or not prompt.strip():
+        return
+
+    memory: ConversationMemory = context.application.bot_data["memory"]
+    gemini: GeminiClient = context.application.bot_data["gemini"]
+
+    user_name = user.full_name or user.username or "User"
+    memory_prompt = f"{user_name}: {prompt}" if chat.type != ChatType.PRIVATE else prompt
+    memory.append_user(chat.id, memory_prompt)
+
+    try:
+        response = await with_typing(
+            context=context,
+            chat_id=chat.id,
+            action=lambda: gemini.generate(memory.get(chat.id)),
+        )
+    except GeminiError as exc:
+        await message.reply_text(str(exc))
+        return
+    except Exception:
+        logger.exception("Unexpected failure while handling message")
+        await message.reply_text("Something went wrong while generating a response.")
+        return
+
+    memory.append_model(chat.id, response)
+    await send_markdown_chunks(message, response)
+
+
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    logger.exception("Unhandled Telegram error. update=%s", update, exc_info=context.error)
