@@ -27,14 +27,13 @@ Async Telegram chatbot built with `python-telegram-bot`, Google Gemini, and per-
 |   +-- memory.py
 |   +-- telegram_utils.py
 +-- api/
-|   +-- webhook.py
+|   +-- index.py
 +-- scripts/
 |   +-- set_webhook.py
 +-- .env.example
 +-- main.py
 +-- README.md
 +-- requirements.txt
-+-- vercel.json
 ```
 
 ## Requirements
@@ -136,7 +135,7 @@ python main.py
 Vercel uses serverless functions, so this project exposes a Telegram webhook at:
 
 ```text
-/api/webhook
+/api
 ```
 
 1. Push this project to GitHub.
@@ -169,7 +168,7 @@ python -c "import os, requests; from dotenv import load_dotenv; load_dotenv(); t
 The webhook URL should end with:
 
 ```text
-/api/webhook
+/api
 ```
 
 ### Persistent Memory on Vercel

@@ -10,7 +10,7 @@ def main() -> None:
 
     parser = argparse.ArgumentParser(description="Point Telegram webhook to Vercel.")
     parser.add_argument("base_url", help="Example: https://your-app.vercel.app")
-    parser.add_argument("--path", default="api/webhook", help="Webhook path on Vercel")
+    parser.add_argument("--path", default="api", help="Webhook path on Vercel")
     args = parser.parse_args()
 
     token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
