@@ -34,7 +34,10 @@ class Settings:
         gemini_model = os.getenv("GEMINI_MODEL", cls.gemini_model).strip()
         max_memory_turns = int(os.getenv("MAX_MEMORY_TURNS", str(cls.max_memory_turns)))
         bot_mode = os.getenv("BOT_MODE", cls.bot_mode).strip().lower()
-        webhook_url = os.getenv("WEBHOOK_URL", "").strip()
+        webhook_url = (
+            os.getenv("WEBHOOK_URL", "").strip()
+            or os.getenv("RENDER_EXTERNAL_URL", "").strip()
+        )
         webhook_path = os.getenv("WEBHOOK_PATH", cls.webhook_path).strip().strip("/")
         webhook_listen = os.getenv("WEBHOOK_LISTEN", cls.webhook_listen).strip()
         webhook_port = int(os.getenv("PORT", os.getenv("WEBHOOK_PORT", str(cls.webhook_port))))

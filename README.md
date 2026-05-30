@@ -121,7 +121,7 @@ python main.py
    - `TELEGRAM_BOT_TOKEN`
    - `GEMINI_API_KEY`
    - `BOT_MODE=webhook`
-   - `WEBHOOK_URL=https://your-render-service-name.onrender.com`
+   - `WEBHOOK_URL=https://your-actual-render-service-name.onrender.com`
    - `WEBHOOK_SECRET_TOKEN=any-long-random-string`
 6. Set the build command:
 
@@ -144,6 +144,8 @@ https://your-render-service-name.onrender.com/telegram-webhook
 ```
 
 If you change `WEBHOOK_PATH`, the final path changes too.
+
+Do not use the example URL literally. Copy your real service URL from the Render dashboard. If `WEBHOOK_URL` is not set, the bot will try to use Render's automatic `RENDER_EXTERNAL_URL` variable.
 
 ## Polling Deployment
 
