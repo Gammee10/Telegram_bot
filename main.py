@@ -18,6 +18,7 @@ def configure_logging() -> None:
 
 def main() -> None:
     configure_logging()
+    logger = logging.getLogger(__name__)
 
     settings = Settings.from_env()
     application = (
@@ -40,7 +41,21 @@ def main() -> None:
 
     register_handlers(application)
 
-    logging.getLogger(__name__).info("Starting bot polling. Press Ctrl+C to stop.")
+    if settings.use_webhook:
+        logger.info("Starting bot webhook on port %s.", settings.webhook_port)
+        application.run_webhook(
+            listen=settings.webhook_listen,
+            port=settings.webhook_port,
+            url_path=settings.webhook_path,
+            webhook_url=settings.full_webhook_url,
+            allowed_updates=["message"],
+            bootstrap_retries=5,
+            drop_pending_updates=True,
+            secret_token=settings.webhook_secret_token or None,
+        )
+        return
+
+    logger.info("Starting bot polling. Press Ctrl+C to stop.")
     application.run_polling(allowed_updates=["message"], bootstrap_retries=5)
 
 

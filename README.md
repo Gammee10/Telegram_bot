@@ -111,15 +111,18 @@ python main.py
 
 5. Deploy. Railway will keep the polling process running.
 
-## Deployment on Render
+## Deployment on Render Web Service
 
 1. Push this project to GitHub.
-2. Create a new **Background Worker** on Render.
+2. Create a new **Web Service** on Render.
 3. Connect the GitHub repo.
 4. Set the runtime to Python 3.
 5. Add environment variables:
    - `TELEGRAM_BOT_TOKEN`
    - `GEMINI_API_KEY`
+   - `BOT_MODE=webhook`
+   - `WEBHOOK_URL=https://your-render-service-name.onrender.com`
+   - `WEBHOOK_SECRET_TOKEN=any-long-random-string`
 6. Set the build command:
 
 ```bash
@@ -132,11 +135,34 @@ pip install -r requirements.txt
 python main.py
 ```
 
-8. Deploy the worker.
+8. Deploy the web service.
+
+Render provides the `PORT` variable automatically. The bot uses that port and registers this Telegram webhook:
+
+```text
+https://your-render-service-name.onrender.com/telegram-webhook
+```
+
+If you change `WEBHOOK_PATH`, the final path changes too.
+
+## Polling Deployment
+
+For paid background workers or VPS hosting, you can keep polling mode:
+
+```env
+BOT_MODE=polling
+```
+
+or leave `BOT_MODE` unset. Then run:
+
+```bash
+python main.py
+```
 
 ## Notes
 
 - Conversation memory is in memory only. Restarting the bot clears it.
+- Free web services may sleep when idle. If the service sleeps, the first Telegram message after idle time can be delayed while the app wakes up.
 - The default Gemini model is `gemini-2.5-flash`. You can override it with:
 
 ```env
