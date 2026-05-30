@@ -10,6 +10,7 @@ class Settings:
     gemini_api_key: str
     gemini_model: str = "gemini-2.5-flash"
     max_memory_turns: int = 12
+    max_voice_bytes: int = 14 * 1024 * 1024
     bot_mode: str = "polling"
     webhook_url: str = ""
     webhook_path: str = "telegram-webhook"
@@ -33,6 +34,7 @@ class Settings:
         gemini_api_key = os.getenv("GEMINI_API_KEY", "").strip()
         gemini_model = os.getenv("GEMINI_MODEL", cls.gemini_model).strip()
         max_memory_turns = int(os.getenv("MAX_MEMORY_TURNS", str(cls.max_memory_turns)))
+        max_voice_bytes = int(os.getenv("MAX_VOICE_BYTES", str(cls.max_voice_bytes)))
         bot_mode = os.getenv("BOT_MODE", cls.bot_mode).strip().lower()
         webhook_url = (
             os.getenv("WEBHOOK_URL", "").strip()
@@ -61,6 +63,7 @@ class Settings:
             gemini_api_key=gemini_api_key,
             gemini_model=gemini_model,
             max_memory_turns=max_memory_turns,
+            max_voice_bytes=max_voice_bytes,
             bot_mode=bot_mode,
             webhook_url=webhook_url,
             webhook_path=webhook_path or cls.webhook_path,

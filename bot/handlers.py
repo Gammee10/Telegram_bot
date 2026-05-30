@@ -12,6 +12,7 @@ from telegram.ext import (
     filters,
 )
 
+from bot.config import Settings
 from bot.gemini import GeminiClient, GeminiError
 from bot.memory import ConversationMemory
 from bot.telegram_utils import remove_bot_mention, send_markdown_chunks, with_typing
@@ -38,6 +39,7 @@ def register_handlers(application: Application) -> None:
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("reset", reset_command))
+    application.add_handler(MessageHandler(filters.VOICE, handle_voice_message))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     application.add_error_handler(error_handler)
 
@@ -116,6 +118,71 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     await send_markdown_chunks(message, response)
 
 
+async def handle_voice_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    message = update.effective_message
+    chat = update.effective_chat
+    user = update.effective_user
+    if not message or not chat or not user or not message.voice:
+        return
+
+    bot_user = await context.bot.get_me()
+    should_answer = chat.type == ChatType.PRIVATE
+
+    if chat.type in {ChatType.GROUP, ChatType.SUPERGROUP}:
+        should_answer = is_reply_to_bot(message, bot_user.id)
+
+    if not should_answer:
+        return
+
+    settings: Settings = context.application.bot_data["settings"]
+    voice = message.voice
+    if voice.file_size and voice.file_size > settings.max_voice_bytes:
+        await message.reply_text("That voice message is too large for me to process.")
+        return
+
+    memory: ConversationMemory = context.application.bot_data["memory"]
+    gemini: GeminiClient = context.application.bot_data["gemini"]
+
+    try:
+        voice_file = await voice.get_file()
+        voice_data = bytes(await voice_file.download_as_bytearray())
+        if len(voice_data) > settings.max_voice_bytes:
+            await message.reply_text("That voice message is too large for me to process.")
+            return
+
+        mime_type = voice.mime_type or "audio/ogg"
+
+        transcript = await with_typing(
+            context=context,
+            chat_id=chat.id,
+            action=lambda: gemini.transcribe_audio(voice_data, mime_type),
+        )
+
+        user_name = user.full_name or user.username or "User"
+        memory_prompt = (
+            f"{user_name} sent a voice message. Transcript: {transcript}"
+            if chat.type != ChatType.PRIVATE
+            else f"Voice message transcript: {transcript}"
+        )
+        memory.append_user(chat.id, memory_prompt)
+
+        response = await with_typing(
+            context=context,
+            chat_id=chat.id,
+            action=lambda: gemini.generate(memory.get(chat.id)),
+        )
+    except GeminiError as exc:
+        await message.reply_text(str(exc))
+        return
+    except Exception:
+        logger.exception("Unexpected failure while handling voice message")
+        await message.reply_text("Something went wrong while processing that voice message.")
+        return
+
+    memory.append_model(chat.id, response)
+    await send_markdown_chunks(message, response)
+
+
 def is_bot_mentioned(message: Message, bot_username: str | None) -> bool:
     if not bot_username or not message.text:
         return False
@@ -131,6 +198,14 @@ def is_bot_mentioned(message: Message, bot_username: str | None) -> bool:
 
     mention_pattern = rf"{re.escape(expected)}\b"
     return bool(re.search(mention_pattern, message.text, re.IGNORECASE))
+
+
+def is_reply_to_bot(message: Message, bot_id: int) -> bool:
+    return bool(
+        message.reply_to_message
+        and message.reply_to_message.from_user
+        and message.reply_to_message.from_user.id == bot_id
+    )
 
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:

@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import logging
 from typing import Any
 
@@ -25,6 +26,9 @@ class GeminiClient:
     async def generate(self, history: list[GeminiMessage]) -> str:
         return await asyncio.to_thread(self._generate_sync, history)
 
+    async def transcribe_audio(self, audio_bytes: bytes, mime_type: str) -> str:
+        return await asyncio.to_thread(self._transcribe_audio_sync, audio_bytes, mime_type)
+
     def _generate_sync(self, history: list[GeminiMessage]) -> str:
         payload: dict[str, Any] = {
             "system_instruction": {
@@ -46,6 +50,41 @@ class GeminiClient:
                 "maxOutputTokens": 2048,
             },
         }
+
+        return self._post_generate_content(payload)
+
+    def _transcribe_audio_sync(self, audio_bytes: bytes, mime_type: str) -> str:
+        encoded_audio = base64.b64encode(audio_bytes).decode("ascii")
+        payload: dict[str, Any] = {
+            "contents": [
+                {
+                    "role": "user",
+                    "parts": [
+                        {
+                            "text": (
+                                "Transcribe this Telegram voice message accurately. "
+                                "Return only the user's spoken words. "
+                                "If the audio is unclear, say what you can understand."
+                            )
+                        },
+                        {
+                            "inline_data": {
+                                "mime_type": mime_type,
+                                "data": encoded_audio,
+                            }
+                        },
+                    ],
+                }
+            ],
+            "generationConfig": {
+                "temperature": 0.1,
+                "maxOutputTokens": 1024,
+            },
+        }
+
+        return self._post_generate_content(payload)
+
+    def _post_generate_content(self, payload: dict[str, Any]) -> str:
 
         try:
             response = requests.post(

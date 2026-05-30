@@ -37,6 +37,7 @@ def main() -> None:
         api_key=settings.gemini_api_key,
         model=settings.gemini_model,
     )
+    application.bot_data["settings"] = settings
     application.bot_data["memory"] = ConversationMemory(max_turns=settings.max_memory_turns)
 
     register_handlers(application)

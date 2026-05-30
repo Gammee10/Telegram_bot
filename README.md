@@ -8,6 +8,7 @@ Async Telegram chatbot built with `python-telegram-bot`, Google Gemini, and per-
 - In groups, responds only when mentioned or when someone replies to the bot
 - `/start`, `/help`, and `/reset`
 - Per-chat conversation memory
+- Voice message support
 - Typing indicator while Gemini generates
 - Markdown responses with plain-text fallback
 - Automatic splitting for long Telegram messages
@@ -93,8 +94,21 @@ In a group, the bot ignores normal chatter. It responds only when:
 
 - A message mentions the bot, for example: `@BotName explain OOP`
 - A user replies to one of the bot's messages, for example: `Can you explain more?`
+- A voice message is sent as a reply to one of the bot's messages
 
 Use `/reset` in any chat to clear that chat's memory.
+
+## Voice Messages
+
+In private chats, send a Telegram voice message and the bot will transcribe it with Gemini, remember the transcript, and reply conversationally.
+
+In groups, voice messages are answered only when they are replies to the bot. This keeps normal group voice notes from triggering the bot by accident.
+
+The default inline voice limit is about 14 MB. You can change it with:
+
+```env
+MAX_VOICE_BYTES=14680064
+```
 
 ## Deployment on Railway
 
