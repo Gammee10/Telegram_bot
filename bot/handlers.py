@@ -1,8 +1,9 @@
 import logging
 import re
 
-from telegram import Update
+from telegram import Message, Update
 from telegram.constants import ChatType
+from telegram import MessageEntity
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -76,8 +77,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     prompt = original_text
 
     if chat.type in {ChatType.GROUP, ChatType.SUPERGROUP}:
-        mention_pattern = rf"@{re.escape(bot_user.username or '')}\b"
-        mentioned = bool(bot_user.username and re.search(mention_pattern, original_text, re.IGNORECASE))
+        mentioned = is_bot_mentioned(message, bot_user.username)
         replied_to_bot = bool(
             message.reply_to_message
             and message.reply_to_message.from_user
@@ -114,6 +114,23 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     memory.append_model(chat.id, response)
     await send_markdown_chunks(message, response)
+
+
+def is_bot_mentioned(message: Message, bot_username: str | None) -> bool:
+    if not bot_username or not message.text:
+        return False
+
+    expected = f"@{bot_username}".lower()
+    for entity in message.entities or []:
+        if entity.type != MessageEntity.MENTION:
+            continue
+
+        mention_text = message.text[entity.offset : entity.offset + entity.length]
+        if mention_text.lower() == expected:
+            return True
+
+    mention_pattern = rf"{re.escape(expected)}\b"
+    return bool(re.search(mention_pattern, message.text, re.IGNORECASE))
 
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
