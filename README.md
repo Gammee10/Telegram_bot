@@ -20,15 +20,21 @@ Async Telegram chatbot built with `python-telegram-bot`, Google Gemini, and per-
 ```text
 .
 +-- bot/
+|   +-- app_factory.py
 |   +-- config.py
 |   +-- gemini.py
 |   +-- handlers.py
 |   +-- memory.py
 |   +-- telegram_utils.py
++-- api/
+|   +-- webhook.py
++-- scripts/
+|   +-- set_webhook.py
 +-- .env.example
 +-- main.py
 +-- README.md
 +-- requirements.txt
++-- vercel.json
 ```
 
 ## Requirements
@@ -125,6 +131,58 @@ python main.py
 
 5. Deploy. Railway will keep the polling process running.
 
+## Deployment on Vercel
+
+Vercel uses serverless functions, so this project exposes a Telegram webhook at:
+
+```text
+/api/webhook
+```
+
+1. Push this project to GitHub.
+2. Go to Vercel and create a new project from the GitHub repo.
+3. Keep the default framework setting as **Other** if Vercel asks.
+4. Add environment variables:
+   - `TELEGRAM_BOT_TOKEN`
+   - `GEMINI_API_KEY`
+   - `BOT_MODE=serverless`
+   - `WEBHOOK_SECRET_TOKEN=any-long-random-string`
+5. Deploy the project.
+6. Copy your production Vercel URL, for example:
+
+```text
+https://your-project.vercel.app
+```
+
+7. Point Telegram to the Vercel webhook from your local terminal:
+
+```bash
+python scripts/set_webhook.py https://your-project.vercel.app
+```
+
+8. Check that Telegram accepted it:
+
+```bash
+python -c "import os, requests; from dotenv import load_dotenv; load_dotenv(); token=os.environ['TELEGRAM_BOT_TOKEN']; print(requests.get(f'https://api.telegram.org/bot{token}/getWebhookInfo').json())"
+```
+
+The webhook URL should end with:
+
+```text
+/api/webhook
+```
+
+### Persistent Memory on Vercel
+
+Serverless memory is not guaranteed to last between requests. For reliable conversation history on Vercel, create a free Upstash Redis database and add these Vercel environment variables:
+
+```env
+UPSTASH_REDIS_REST_URL=your_upstash_rest_url
+UPSTASH_REDIS_REST_TOKEN=your_upstash_rest_token
+```
+
+Without Upstash, the bot still replies, but conversation memory can reset when Vercel starts a fresh function instance.
+
 ## Deployment on Render Web Service
 
 1. Push this project to GitHub.
@@ -175,9 +233,25 @@ or leave `BOT_MODE` unset. Then run:
 python main.py
 ```
 
+## Turning Off Render
+
+Only one webhook host should own the Telegram bot at a time. After moving to Vercel:
+
+1. Open the Render dashboard.
+2. Open the old bot service.
+3. Go to **Settings**.
+4. Choose **Suspend Service** or **Delete Service**.
+5. Confirm the action.
+
+Then run the Vercel webhook command again:
+
+```bash
+python scripts/set_webhook.py https://your-project.vercel.app
+```
+
 ## Notes
 
-- Conversation memory is in memory only. Restarting the bot clears it.
+- Conversation memory uses Upstash Redis when `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are set. Otherwise it falls back to in-memory storage.
 - Free web services may sleep when idle. If the service sleeps, the first Telegram message after idle time can be delayed while the app wakes up.
 - The default Gemini model is `gemini-2.5-flash`. You can override it with:
 

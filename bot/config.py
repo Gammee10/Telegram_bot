@@ -17,6 +17,8 @@ class Settings:
     webhook_listen: str = "0.0.0.0"
     webhook_port: int = 8000
     webhook_secret_token: str = ""
+    upstash_redis_rest_url: str = ""
+    upstash_redis_rest_token: str = ""
 
     @property
     def use_webhook(self) -> bool:
@@ -44,15 +46,18 @@ class Settings:
         webhook_listen = os.getenv("WEBHOOK_LISTEN", cls.webhook_listen).strip()
         webhook_port = int(os.getenv("PORT", os.getenv("WEBHOOK_PORT", str(cls.webhook_port))))
         webhook_secret_token = os.getenv("WEBHOOK_SECRET_TOKEN", "").strip()
+        upstash_redis_rest_url = os.getenv("UPSTASH_REDIS_REST_URL", "").strip()
+        upstash_redis_rest_token = os.getenv("UPSTASH_REDIS_REST_TOKEN", "").strip()
+        is_vercel = os.getenv("VERCEL", "").strip() == "1"
 
         missing = []
         if not telegram_bot_token:
             missing.append("TELEGRAM_BOT_TOKEN")
         if not gemini_api_key:
             missing.append("GEMINI_API_KEY")
-        if bot_mode not in {"polling", "webhook"}:
-            raise RuntimeError("BOT_MODE must be either 'polling' or 'webhook'")
-        if bot_mode == "webhook" and not webhook_url:
+        if bot_mode not in {"polling", "webhook", "serverless"}:
+            raise RuntimeError("BOT_MODE must be 'polling', 'webhook', or 'serverless'")
+        if bot_mode == "webhook" and not webhook_url and not is_vercel:
             missing.append("WEBHOOK_URL")
         if missing:
             names = ", ".join(missing)
@@ -70,4 +75,6 @@ class Settings:
             webhook_listen=webhook_listen,
             webhook_port=webhook_port,
             webhook_secret_token=webhook_secret_token,
+            upstash_redis_rest_url=upstash_redis_rest_url,
+            upstash_redis_rest_token=upstash_redis_rest_token,
         )
