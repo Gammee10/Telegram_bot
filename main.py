@@ -51,7 +51,7 @@ def main() -> None:
             webhook_url=settings.full_webhook_url,
             allowed_updates=["message"],
             bootstrap_retries=5,
-            drop_pending_updates=True,
+            drop_pending_updates=False,
             secret_token=settings.webhook_secret_token or None,
         )
         return
